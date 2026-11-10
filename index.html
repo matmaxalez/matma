@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f4f1ea">
+<title>Liczenie</title>
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --ink: #2f3437;
+    --soft: #8a8f92;
+    --line: #cfcabd;
+    --key: #fbf9f4;
+    --accent: #5b7a8c;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Avenir Next", "Nunito", "Segoe UI", system-ui, sans-serif;
+    touch-action: manipulation;
+    -webkit-user-select: none; user-select: none;
+    overflow: hidden;
+  }
+  button { font: inherit; color: inherit; touch-action: manipulation; }
+  .screen { display: none; height: 100%; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+  .screen.on { display: flex; }
+
+  /* ---------- start ---------- */
+  #start, #end { flex-direction: column; align-items: center; justify-content: center; gap: 28px; }
+  .group { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .label { color: var(--soft); font-size: 18px; }
+  .choices { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .choice {
+    min-width: 84px; padding: 14px 20px; font-size: 24px;
+    background: transparent; border: 2px solid var(--line); border-radius: 14px;
+  }
+  .choice.sel { border-color: var(--accent); background: var(--key); }
+  .big {
+    padding: 18px 56px; font-size: 30px;
+    background: var(--accent); color: #fff; border: 0; border-radius: 16px;
+  }
+  .note { color: var(--soft); font-size: 16px; max-width: 30em; text-align: center; }
+  .result { font-size: 64px; }
+
+  /* ---------- game ---------- */
+  #game { flex-direction: column; gap: 12px; }
+  .top { display: flex; align-items: center; gap: 14px; height: 40px; flex: none; }
+  .quit {
+    width: 40px; height: 40px; font-size: 24px; line-height: 1;
+    background: transparent; border: 0; color: var(--soft);
+  }
+  .dots { display: flex; gap: 8px; flex: 1; justify-content: center; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); }
+  .dot.done { background: var(--line); }
+  .dot.now { border-color: var(--accent); }
+  .spacer { width: 40px; }
+
+  .board { flex: 1; min-height: 0; display: grid; gap: 16px; grid-template-rows: 1fr auto; }
+  .task { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vmin; min-height: 0; }
+  .eq {
+    display: flex; align-items: center; gap: .28em;
+    font-size: clamp(56px, 15vmin, 150px); font-weight: 600; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .box {
+    min-width: 1.5em; height: 1.35em; padding: 0 .15em;
+    display: flex; align-items: center; justify-content: center;
+    border: .05em solid var(--ink); border-radius: .16em; background: var(--key);
+  }
+  .box.ok { border-color: var(--accent); color: var(--accent); }
+  .hint {
+    min-height: 1.3em; font-size: clamp(26px, 6vmin, 56px); color: var(--soft);
+    display: flex; align-items: center; gap: .45em; flex-wrap: wrap; justify-content: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .hint b { color: var(--ink); font-weight: 600; }
+  .again {
+    width: 1.5em; height: 1.5em; padding: .28em; margin-left: .3em;
+    background: transparent; border: 2px solid var(--line); border-radius: 50%; color: var(--accent);
+  }
+  .again svg { width: 100%; height: 100%; display: block; }
+
+  .pad {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    width: min(100%, 460px); margin: 0 auto;
+  }
+  .key {
+    height: clamp(56px, 9.5vh, 92px); font-size: clamp(28px, 5vmin, 44px); font-weight: 600;
+    background: var(--key); border: 2px solid var(--line); border-radius: 16px;
+  }
+  .key:active { background: #ece8dd; }
+  .key.okkey { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .key.okkey:active { background: #4d6a7a; }
+  .key:disabled { opacity: .4; }
+
+  @media (orientation: landscape) {
+    .board { grid-template-rows: none; grid-template-columns: 1.25fr 1fr; align-items: center; }
+    .pad { width: min(100%, 420px); }
+    .key { height: clamp(52px, 17vh, 110px); }
+  }
+</style>
+</head>
+<body>
+
+<section id="start" class="screen on">
+  <div class="group">
+    <div class="label" data-t="range"></div>
+    <div class="choices" data-opt="max">
+      <button class="choice" data-v="7">7</button>
+      <button class="choice" data-v="10">10</button>
+      <button class="choice" data-v="20">20</button>
+    </div>
+  </div>
+  <div class="group">
+    <div class="label" data-t="ops"></div>
+    <div class="choices" data-opt="ops">
+      <button class="choice" data-v="+">+</button>
+      <button class="choice" data-v="-">−</button>
+      <button class="choice" data-v="+-">+ −</button>
+    </div>
+  </div>
+  <div class="group">
+    <div class="label" data-t="voice"></div>
+    <div class="choices" data-opt="lang">
+      <button class="choice" data-v="pl">polski</button>
+      <button class="choice" data-v="nl">Nederlands</button>
+    </div>
+  </div>
+  <button class="big" id="go">Start</button>
+  <div class="note" id="novoice" hidden></div>
+</section>
+
+<section id="game" class="screen">
+  <div class="top">
+    <button class="quit" id="quit" aria-label="stop">×</button>
+    <div class="dots" id="dots"></div>
+    <div class="spacer"></div>
+  </div>
+  <div class="board">
+    <div class="task">
+      <div class="eq">
+        <span id="a"></span><span id="op"></span><span id="b"></span><span>=</span>
+        <span class="box" id="box"></span>
+      </div>
+      <div class="hint" id="hint"></div>
+    </div>
+    <div class="pad" id="pad"></div>
+  </div>
+</section>
+
+<section id="end" class="screen">
+  <div class="result" id="result"></div>
+  <button class="big" id="more"></button>
+  <button class="choice" id="back"></button>
+</section>
+
+<script>
+(function () {
+  'use strict';
+
+  var ROUND = 10;
+
+  var T = {
+    pl: { range: 'liczby do', ops: 'działania', voice: 'głos', more: 'Jeszcze raz', back: 'Ustawienia',
+          novoice: 'Ta przeglądarka nie ma głosu — podpowiedź pojawi się tylko na ekranie.' },
+    nl: { range: 'getallen tot', ops: 'bewerkingen', voice: 'stem', more: 'Nog een keer', back: 'Instellingen',
+          novoice: 'Deze browser heeft geen stem — de uitleg verschijnt alleen op het scherm.' }
+  };
+
+  var cfg = { max: 10, ops: '+-', lang: 'pl' };
+  try { Object.assign(cfg, JSON.parse(localStorage.getItem('matma') || '{}')); } catch (e) {}
+  function save() { try { localStorage.setItem('matma', JSON.stringify(cfg)); } catch (e) {} }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var canSpeak = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+
+  /* ---------- screens ---------- */
+  function show(id) {
+    ['start', 'game', 'end'].forEach(function (s) { $(s).classList.toggle('on', s === id); });
+  }
+
+  function paintStart() {
+    var t = T[cfg.lang];
+    document.documentElement.lang = cfg.lang;
+    document.querySelectorAll('[data-t]').forEach(function (el) { el.textContent = t[el.dataset.t]; });
+    document.querySelectorAll('[data-opt]').forEach(function (g) {
+      g.querySelectorAll('.choice').forEach(function (b) {
+        b.classList.toggle('sel', String(cfg[g.dataset.opt]) === b.dataset.v);
+      });
+    });
+    $('more').textContent = t.more;
+    $('back').textContent = t.back;
+    $('novoice').textContent = t.novoice;
+    $('novoice').hidden = canSpeak;
+  }
+
+  document.querySelectorAll('[data-opt]').forEach(function (g) {
+    g.addEventListener('click', function (e) {
+      var b = e.target.closest('.choice');
+      if (!b) return;
+      var k = g.dataset.opt;
+      cfg[k] = k === 'max' ? Number(b.dataset.v) : b.dataset.v;
+      save();
+      paintStart();
+    });
+  });
+
+  /* ---------- tasks ---------- */
+  function rnd(n) { return Math.floor(Math.random() * (n + 1)); }
+
+  function makeTask(prev) {
+    for (var i = 0; i < 30; i++) {
+      var op = cfg.ops === '+-' ? (Math.random() < 0.5 ? '+' : '-') : cfg.ops;
+      var a, b;
+      if (op === '+') { a = rnd(cfg.max); b = rnd(cfg.max - a); }
+      else { a = rnd(cfg.max); b = rnd(a); }
+      // zera są w porządku, ale nie za często
+      if ((a === 0 || b === 0) && Math.random() < 0.7) continue;
+      if (prev && prev.a === a && prev.b === b && prev.op === op) continue;
+      return { a: a, b: b, op: op, r: op === '+' ? a + b : a - b };
+    }
+    return { a: 2, b: 1, op: '+', r: 3 };
+  }
+
+  function seq(from, to) {
+    var out = [], step = from <= to ? 1 : -1;
+    for (var n = from; n !== to + step; n += step) out.push(n);
+    return out;
+  }
+
+  /* Wyjaśnienie: lista krótkich zdań do powiedzenia + to, co pokazać na ekranie. */
+  function explain(t) {
+    var a = t.a, b = t.b, r = t.r, pl = cfg.lang === 'pl';
+    var say = [], start = null, steps = [];
+    var name = pl ? (a + (t.op === '+' ? ' dodać ' : ' odjąć ') + b)
+                  : (a + (t.op === '+' ? ' plus ' : ' min ') + b);
+    var final = name + (pl ? ' to ' : ' is ') + r + '.';
+    say.push(name + '.');
+
+    if (t.op === '+') {
+      if (a === 0 || b === 0) {
+        say.push(pl ? 'Zero to nic. Nic nie dokładamy, więc zostaje ' + r + '.'
+                    : 'Nul is niets. Er komt niets bij, dus het blijft ' + r + '.');
+      } else {
+        var big = Math.max(a, b), small = Math.min(a, b);
+        if (b > a) say.push(pl ? 'Łatwiej zacząć od większej liczby.' : 'Begin bij het grootste getal.');
+        say.push(pl ? 'Zacznij od liczby ' + big + '.' : 'Begin bij ' + big + '.');
+        say.push(pl ? 'Policz dalej o ' + small + '.' : 'Tel ' + small + ' verder.');
+        start = big; steps = seq(big + 1, r);
+        steps.forEach(function (n) { say.push(String(n)); });
+      }
+    } else {
+      if (b === 0) {
+        say.push(pl ? 'Zero to nic. Nic nie zabieramy, więc zostaje ' + r + '.'
+                    : 'Nul is niets. Er gaat niets weg, dus het blijft ' + r + '.');
+      } else if (a === b) {
+        say.push(pl ? 'Zabieramy wszystko, więc nie zostaje nic.' : 'Alles gaat weg, dus er blijft niets over.');
+      } else if (b <= 5 || b <= r) {
+        say.push(pl ? 'Zacznij od liczby ' + a + '.' : 'Begin bij ' + a + '.');
+        say.push(pl ? 'Cofnij się o ' + b + '.' : 'Tel ' + b + ' terug.');
+        start = a; steps = seq(a - 1, r);
+        steps.forEach(function (n) { say.push(String(n)); });
+      } else {
+        say.push(pl ? 'Zacznij od liczby ' + b + '.' : 'Begin bij ' + b + '.');
+        say.push(pl ? 'Policz dalej do ' + a + '.' : 'Tel verder tot ' + a + '.');
+        start = b; steps = seq(b + 1, a);
+        steps.forEach(function (n) { say.push(String(n)); });
+        say.push(pl ? 'Ile liczb policzyłaś? ' + r + '.' : 'Hoeveel getallen heb je geteld? ' + r + '.');
+      }
+    }
+    say.push(final);
+    return { say: say, start: start, steps: steps };
+  }
+
+  /* ---------- voice ---------- */
+  function voiceFor(lang) {
+    var vs = speechSynthesis.getVoices() || [];
+    var m = vs.filter(function (v) { return v.lang && v.lang.toLowerCase().replace('_', '-').indexOf(lang) === 0; });
+    return m.filter(function (v) { return v.localService; })[0] || m[0] || null;
+  }
+
+  function speak(lines) {
+    if (!canSpeak) return;
+    speechSynthesis.cancel();
+    var v = voiceFor(cfg.lang);
+    lines.forEach(function (line) {
+      var u = new SpeechSynthesisUtterance(line);
+      u.lang = v ? v.lang : (cfg.lang === 'pl' ? 'pl-PL' : 'nl-BE');
+      if (v) u.voice = v;
+      u.rate = 0.8;
+      speechSynthesis.speak(u);
+    });
+  }
+  function hush() { if (canSpeak) speechSynthesis.cancel(); }
+  if (canSpeak) speechSynthesis.getVoices(); // niektóre przeglądarki ładują głosy dopiero po pierwszym zapytaniu
+
+  /* ---------- game ---------- */
+  var st = null;
+
+  var SPEAKER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg>';
+
+  function buildPad() {
+    var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
+    $('pad').innerHTML = keys.map(function (k) {
+      var txt = k === 'del' ? '⌫' : k === 'ok' ? 'OK' : k;
+      return '<button class="key' + (k === 'ok' ? ' okkey' : '') + '" data-k="' + k + '">' + txt + '</button>';
+    }).join('');
+  }
+
+  function paintDots() {
+    var h = '';
+    for (var i = 0; i < ROUND; i++) {
+      h += '<span class="dot' + (i < st.n ? ' done' : i === st.n ? ' now' : '') + '"></span>';
+    }
+    $('dots').innerHTML = h;
+  }
+
+  function paintBox() {
+    $('box').textContent = st.typed;
+    $('pad').querySelector('[data-k="ok"]').disabled = st.typed === '' || st.locked;
+  }
+
+  function nextTask() {
+    if (st.n >= ROUND) return finish();
+    st.task = makeTask(st.task);
+    st.typed = ''; st.tries = 0; st.locked = false;
+    $('a').textContent = st.task.a;
+    $('op').textContent = st.task.op === '+' ? '+' : '−';
+    $('b').textContent = st.task.b;
+    $('box').classList.remove('ok');
+    $('hint').innerHTML = '';
+    paintDots();
+    paintBox();
+  }
+
+  function showHint(ex) {
+    var h = '';
+    if (ex.start !== null) {
+      h += '<b>' + ex.start + '</b><span>→</span>' + ex.steps.map(function (n) { return '<span>' + n + '</span>'; }).join('');
+    }
+    if (canSpeak) h += '<button class="again" id="again" aria-label="powtórz">' + SPEAKER + '</button>';
+    $('hint').innerHTML = h;
+  }
+
+  function submit() {
+    if (st.locked || st.typed === '') return;
+    var t = st.task;
+    if (Number(st.typed) === t.r) {
+      st.locked = true;
+      hush();
+      if (st.tries === 0) st.good++;
+      $('box').classList.add('ok');
+      $('hint').innerHTML = '';
+      paintBox();
+      st.timer = setTimeout(function () { st.n++; nextTask(); }, 1100);
+    } else {
+      st.tries++;
+      st.typed = '';
+      var ex = explain(t);
+      showHint(ex);
+      paintBox();
+      speak(ex.say);
+    }
+  }
+
+  $('pad').addEventListener('click', function (e) {
+    var b = e.target.closest('.key');
+    if (!b || !st || st.locked) return;
+    var k = b.dataset.k;
+    if (k === 'ok') return submit();
+    if (k === 'del') st.typed = st.typed.slice(0, -1);
+    else if (st.typed.length < 2) st.typed = (st.typed === '0' ? '' : st.typed) + k;
+    paintBox();
+  });
+
+  $('hint').addEventListener('click', function (e) {
+    if (e.target.closest('#again')) speak(explain(st.task).say);
+  });
+
+  function startGame() {
+    st = { n: 0, good: 0, task: null, typed: '', tries: 0, locked: false, timer: null };
+    if (canSpeak) speak(['']); // odblokowuje głos na iOS (wymaga dotknięcia)
+    show('game');
+    nextTask();
+  }
+
+  function stopGame() {
+    hush();
+    if (st) clearTimeout(st.timer);
+    paintStart();
+    show('start');
+  }
+
+  function finish() {
+    $('result').textContent = st.good + ' / ' + ROUND;
+    show('end');
+  }
+
+  $('go').addEventListener('click', startGame);
+  $('more').addEventListener('click', startGame);
+  $('back').addEventListener('click', stopGame);
+  $('quit').addEventListener('click', stopGame);
+
+  buildPad();
+  paintStart();
+})();
+</script>
+</body>
+</html>
